@@ -36,9 +36,10 @@ impl<'c, 's, I: Iterator<Item = style::StyledStr<'s>>> Wrapper<'c, 's, I> {
 impl<'c, 's, I: Iterator<Item = style::StyledStr<'s>>> Iterator for Wrapper<'c, 's, I> {
     // This iterator yields pairs of lines and the length difference between the input words and
     // the line.
-    type Item = (Vec<style::StyledCow<'s>>, usize);
+    type Item = (Vec<style::StyledCow<'s>>, usize, bool);
 
-    fn next(&mut self) -> Option<(Vec<style::StyledCow<'s>>, usize)> {
+    // Last argument is wether the last word was pushed to the next line.
+    fn next(&mut self) -> Option<(Vec<style::StyledCow<'s>>, usize, bool)> {
         // Append words to self.buf until the maximum line length is reached
         while let Some(s) = self.iter.next() {
             let mut width = s.width(&self.context.font_cache);
@@ -70,7 +71,8 @@ impl<'c, 's, I: Iterator<Item = style::StyledStr<'s>>> Iterator for Wrapper<'c, 
                 let v = std::mem::take(&mut self.buf);
                 self.buf.push(s);
                 self.x = width;
-                return Some((v, delta));
+                // the word has not been pushed to the next line, so we return false
+                return Some((v, delta, false));
             } else {
                 // The word fits in the current line, so just append it
                 self.buf.push(s.into());
@@ -81,7 +83,8 @@ impl<'c, 's, I: Iterator<Item = style::StyledStr<'s>>> Iterator for Wrapper<'c, 
         if self.buf.is_empty() {
             None
         } else {
-            Some((mem::take(&mut self.buf), 0))
+            // we broke out of the loop, so the word was pushed from last line: return true
+            Some((mem::take(&mut self.buf), 0, true))
         }
     }
 }

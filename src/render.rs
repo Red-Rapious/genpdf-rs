@@ -335,7 +335,7 @@ impl<'a> Area<'a> {
         s: S,
     ) -> Result<bool, Error> {
         if let Ok(mut section) = self.text_section(font_cache, position, style) {
-            section.print_str(s, style)?;
+            section.print_str(s, style, None)?;
             Ok(true)
         } else {
             Ok(false)
@@ -424,7 +424,12 @@ impl<'a, 'f, 'l> TextSection<'a, 'f, 'l> {
     /// Prints the given string with the given style.
     ///
     /// The font cache for this text section must contain the PDF font for the given style.
-    pub fn print_str(&mut self, s: impl AsRef<str>, style: Style) -> Result<(), Error> {
+    pub fn print_str(
+        &mut self,
+        s: impl AsRef<str>,
+        style: Style,
+        character_spacing: Option<f64>,
+    ) -> Result<(), Error> {
         let font = style.font(self.font_cache);
         if font.is_builtin() {
             // Built-in fonts always use the Windows-1252 encoding.  The conversion is done by
@@ -444,6 +449,14 @@ impl<'a, 'f, 'l> TextSection<'a, 'f, 'l> {
         }
         self.fill_color = style.color();
         self.layer().set_font(font, style.font_size().into());
+        if let Some(spacing) = character_spacing {
+            // 3.0 is an empirically-found constant.
+            // I tried to tweak multiple factors (font size, ...) but nothing seems to
+            // affect this constant
+            self.layer().set_character_spacing(spacing * 3.0);
+        } else {
+            self.layer().set_character_spacing(0.0); // default value
+        }
         self.layer().write_text(s.as_ref(), font);
         Ok(())
     }

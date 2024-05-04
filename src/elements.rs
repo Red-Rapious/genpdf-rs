@@ -192,6 +192,8 @@ pub enum Alignment {
     Right,
     /// Centered.
     Center,
+    /// Justified.
+    Justified,
 }
 
 impl Default for Alignment {
@@ -294,7 +296,7 @@ impl Paragraph {
 
     fn get_offset(&self, width: Mm, max_width: Mm) -> Mm {
         match self.alignment {
-            Alignment::Left => Mm::default(),
+            Alignment::Left | Alignment::Justified => Mm::default(),
             Alignment::Center => (max_width - width) / 2.0,
             Alignment::Right => max_width - width,
         }
@@ -331,13 +333,20 @@ impl Element for Paragraph {
         let height = style.line_height(&context.font_cache);
         let words = self.words.iter().map(Into::into);
         let mut rendered_len = 0;
-        for (line, delta) in wrap::Wrapper::new(words, context, area.size().width) {
+        for (line, delta, end_line) in wrap::Wrapper::new(words, context, area.size().width) {
             let width = line.iter().map(|s| s.width(&context.font_cache)).sum();
             let position = Position::new(self.get_offset(width, area.size().width), 0);
+            let char_numbers = line.iter().map(|s| s.s.len()).sum::<usize>() as f64;
+
             // TODO: calculate the maximum line height
             if let Ok(mut section) = area.text_section(&context.font_cache, position, style) {
                 for s in line {
-                    section.print_str(&s.s, s.style)?;
+                    let character_spacing = if !end_line && self.alignment == Alignment::Justified {
+                        Some(((area.size().width - width) / char_numbers).0)
+                    } else {
+                        None
+                    };
+                    section.print_str(&s.s, s.style, character_spacing)?;
                     rendered_len += s.s.len();
                 }
                 rendered_len -= delta;
